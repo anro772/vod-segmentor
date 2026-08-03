@@ -1,0 +1,18 @@
+# secrets — config.yaml holds the Riot API key; copy config.example.yaml
+config.yaml
+
+# python
+venv/
+__pycache__/
+*.pyc
+
+# per-VOD data (huge: source video, frames, chat renders, cut games)
+work/
+output/
+
+# TwitchDownloaderCLI binaries — see README, downloaded from GitHub releases
+tools/TwitchDownloaderCLI/
+tools/tdcli.zip
+
+# logs / scratch
+*.log

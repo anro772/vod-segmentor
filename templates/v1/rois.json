@@ -1,0 +1,99 @@
+{
+  "canonical": [
+    1280,
+    720
+  ],
+  "states": {
+    "CHAMP_SELECT": [
+      {
+        "name": "cs_header",
+        "file": "cs_header.png",
+        "roi": [
+          0.225,
+          0.012,
+          0.44,
+          0.048
+        ]
+      }
+    ],
+    "LOADING": [
+      {
+        "name": "load_crest",
+        "file": "load_crest.png",
+        "roi": [
+          0.46,
+          0.05,
+          0.53,
+          0.095
+        ]
+      }
+    ],
+    "IN_GAME": [
+      {
+        "name": "ig_topright",
+        "file": "ig_topright.png",
+        "roi": [
+          0.81,
+          0.0,
+          0.995,
+          0.028
+        ],
+        "threshold": 0.45
+      },
+      {
+        "name": "ig_minimap_terrain",
+        "file": "ig_minimap_terrain.png",
+        "roi": [
+          0.82,
+          0.68,
+          0.97,
+          0.93
+        ],
+        "threshold": 0.3
+      },
+      {
+        "name": "ig_stats_icons",
+        "file": "ig_stats_icons.png",
+        "roi": [
+          0.238,
+          0.9,
+          0.262,
+          0.985
+        ],
+        "threshold": 0.7
+      }
+    ],
+    "ENDGAME": [
+      {
+        "name": "eg_tabs",
+        "file": "eg_tabs.png",
+        "roi": [
+          0.008,
+          0.085,
+          0.14,
+          0.11
+        ]
+      },
+      {
+        "name": "eg_victory",
+        "file": "eg_victory.png",
+        "roi": [
+          0.03,
+          0.012,
+          0.125,
+          0.05
+        ]
+      },
+      {
+        "name": "eg_defeat",
+        "file": "eg_defeat.png",
+        "roi": [
+          0.03,
+          0.012,
+          0.125,
+          0.05
+        ]
+      }
+    ]
+  }
+}

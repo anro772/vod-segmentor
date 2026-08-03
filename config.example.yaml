@@ -1,0 +1,66 @@
+# thebausffs VOD splitter — Phase 1 config
+paths:
+  workdir: work
+  output_dir: output
+  templates_dir: templates/v1
+
+sampling:
+  sample_interval_sec: 5
+  canonical_width: 1280
+  canonical_height: 720
+
+classify:
+  # per-state score thresholds (peak TM_CCOEFF_NORMED). Tune via work/classification.json
+  thresholds:
+    CHAMP_SELECT: 0.70
+    LOADING: 0.70
+    IN_GAME: 0.60
+    ENDGAME: 0.70
+  # IN_GAME uses multiple anchors; require this many to clear threshold
+  ingame_min_anchors: 2
+  # search window padding around each ROI, as fraction of frame
+  roi_search_pad: 0.02
+
+segment:
+  start_marker: champ_select      # champ_select | loading | ingame-only fallback always applies
+  min_consecutive: 2              # debounce for IN_GAME / OTHER transitions
+  min_game_minutes: 10
+  max_ingame_gap_sec: 60          # tolerate alt-tabs / pauses mid-game
+  start_lookback_sec: 900         # how far before first IN_GAME to accept champ select/loading as start
+  start_backoff_sec: 30           # if no champ select/loading found: start = first IN_GAME - backoff
+  lead_pad_sec: 5
+  tail_pad_sec: 8
+
+encode:
+  encoder: amf                   # x264 | amf
+  crf: 21                        # x264 only
+  qp: 26                         # amf only (cqp); higher = smaller. measured on this vod: 20≈10Mbps, 24≈6.5, 26≈5.2, 28≈4.2
+  preset: medium
+  audio: copy
+
+cleanup:
+  keep_source: true               # keep during Phase 1 bring-up
+  keep_frames: true
+
+# Phase 2/3: title + thumbnail enrichment (CV pipeline never depends on this)
+riot:
+  api_key: RGAPI-YOUR-KEY-HERE   # dev key, expires every 24h!
+  game_name: Thebausffs
+  tag_line: COOL                  # main acct; alt-account games won't match and are skipped
+  routing: europe                 # EUW -> europe match-v5 routing
+  match_window_min: 10            # max |riot gameStart - detected start| to accept a match
+
+chat:
+  enabled: true                   # burn synced twitch chat into every cut
+  width: 440
+  height: 190                     # ~4-5 lines
+  font_size: 14
+  outline_size: 3                 # black text outline (background is fully transparent)
+  x: 365                          # overlay position on the 1920x1080 frame
+  y: 783
+
+thumbnails:
+  cutouts_dir: cutouts            # transparent 1280x720 PNGs, left*/right* = face side
+  frame_at: 0.6                   # take gameplay still at this fraction of the game
+  font: C:/Windows/Fonts/impact.ttf
+
