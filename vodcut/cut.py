@@ -4,7 +4,8 @@ from pathlib import Path
 
 
 def cut_one(seg: dict, source: str | Path, out: Path, encode_cfg: dict,
-            chat: Path | None = None, chat_pos: tuple[int, int] = (365, 783)) -> Path:
+            chat: tuple[Path, Path] | None = None,
+            chat_pos: tuple[int, int] = (365, 783)) -> Path:
     if encode_cfg["encoder"] == "amf":
             qp = str(encode_cfg.get("qp", 24))
             vcodec = ["-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp",
@@ -14,10 +15,15 @@ def cut_one(seg: dict, source: str | Path, out: Path, encode_cfg: dict,
                   "-crf", str(encode_cfg["crf"])]
     span = ["-ss", str(seg["start_sec"]), "-to", str(seg["end_sec"])]
     if chat:
-        # same -ss/-to on the chat render keeps it frame-synced to the game
-        inputs = [*span, "-i", str(source), *span, "-i", str(chat),
+        # chat = (picture, alpha mask) h264 pair from --generate-mask;
+        # alphamerge restores transparency, and the same -ss/-to on both
+        # keeps the overlay frame-synced to the game
+        video, mask = chat
+        inputs = [*span, "-i", str(source), *span, "-i", str(video),
+                  *span, "-i", str(mask),
                   "-filter_complex",
-                  f"[0:v][1:v]overlay={chat_pos[0]}:{chat_pos[1]}[v]",
+                  "[2:v]format=gray[m];[1:v][m]alphamerge[ck];"
+                  f"[0:v][ck]overlay={chat_pos[0]}:{chat_pos[1]}[v]",
                   "-map", "[v]", "-map", "0:a"]
     else:
         inputs = [*span, "-i", str(source)]
@@ -32,7 +38,7 @@ def cut_one(seg: dict, source: str | Path, out: Path, encode_cfg: dict,
 
 def cut_segments(segments_path: str | Path, source: str | Path, output_dir: str,
                  encode_cfg: dict, only: list[int] | None = None,
-                 chat: Path | None = None,
+                 chat: tuple[Path, Path] | None = None,
                  chat_pos: tuple[int, int] = (365, 783)) -> list[Path]:
     manifest = json.loads(Path(segments_path).read_text())
     vod_id = manifest["vod_id"]

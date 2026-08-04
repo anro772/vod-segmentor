@@ -196,7 +196,9 @@ def make_thumbnail(source: Path, seg: dict, cfg: dict, out: Path) -> Path:
     riot = seg.get("riot")
     if riot:
         from vodcut.enrich import fun_fact
-        note = fun_fact(riot)
+        # enrich picks these with a VOD-wide used-set so consecutive thumbnails
+        # don't all read "NNK TURRET DMG"; fall back for standalone calls.
+        note = seg.get("fun_fact") or fun_fact(riot)
         if note:
             _draw_note(img, note, side, tcfg["font"])
 

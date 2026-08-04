@@ -5,6 +5,7 @@
 """
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from vodcut.config import load_config
@@ -61,7 +62,7 @@ def cmd_produce(args):
     only = [int(x) for x in args.only.split(",")] if args.only else None
     chat = ensure_chat(cfg, vod_id, cfg["paths"]["workdir"])
     chat_pos = (cfg["chat"]["x"], cfg["chat"]["y"])
-    manifest = enrich_segments(cfg, args.url)
+    manifest = enrich_segments(cfg, vod_id, args.url, only)
     for seg in manifest["segments"]:
         if only and seg["index"] not in only:
             continue
@@ -81,10 +82,11 @@ def cmd_enrich(args):
     from vodcut.enrich import enrich_segments
     from vodcut.thumbnail import make_thumbnail
     cfg = load_config(args.config)
-    _scope_to_vod(cfg, vod_id_from_url(args.url))
+    vod_id = vod_id_from_url(args.url)
+    _scope_to_vod(cfg, vod_id)
     out_dir = Path(cfg["paths"]["output_dir"])
     source = Path(cfg["paths"]["workdir"]) / "source.mp4"
-    manifest = enrich_segments(cfg, args.url)
+    manifest = enrich_segments(cfg, vod_id, args.url)
     for seg in manifest["segments"]:
         gdir = out_dir / "games" / f"game_{seg['index']:02d}"
         gdir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +98,51 @@ def cmd_enrich(args):
             print(f"[enrich] game {seg['index']}: {gdir}")
         else:
             print(f"[enrich] game {seg['index']}: no source.mp4, skipped thumbnail")
+
+
+def cmd_retitle(args):
+    """Regenerate titles only, from cached riot/chat/transcript data.
+
+    No download, no Riot key, no re-encode — this is the loop for tuning the
+    prompt, since a full `produce` costs hours of encoding.
+    """
+    from vodcut.enrich import enrich_segments
+    cfg = load_config(args.config)
+    _scope_to_vod(cfg, args.vod_id)
+    out_dir = Path(cfg["paths"]["output_dir"])
+    only = [int(x) for x in args.only.split(",")] if args.only else None
+    manifest = enrich_segments(cfg, args.vod_id, None, only)
+
+    renames = []
+    for seg in manifest["segments"]:
+        title = seg.get("title")
+        if not title or (only and seg["index"] not in only):
+            continue
+        gdir = out_dir / "games" / f"game_{seg['index']:02d}"
+        if not gdir.exists():
+            continue
+        (gdir / "title.txt").write_text(title, encoding="utf-8")
+        (gdir / "meta.json").write_text(json.dumps(seg, indent=2), encoding="utf-8")
+        want = f"{_safe_name(title)}.mp4"
+        for mp4 in gdir.glob("*.mp4"):
+            if mp4.name != want:
+                renames.append((mp4, gdir / want))
+
+    if renames and args.rename:
+        for old, new in renames:
+            if new.exists() and new != old:
+                print(f"  skip {old.name}: {new.name} already exists")
+                continue
+            old.rename(new)
+            print(f"  renamed {old.parent.name}\\{new.name}")
+        print(f"\n{len(renames)} video(s) renamed to match their new title.")
+    elif renames:
+        # Not renamed by default: the video itself is unchanged and may already
+        # have been uploaded under the old name.
+        print(f"\n{len(renames)} existing .mp4 no longer match their title:")
+        for old, new in renames:
+            print(f"  {old.parent.name}\\{old.name}\n    -> {new.name}")
+        print("Re-run with --rename to apply, or leave them as they are.")
 
 
 def cmd_cut(args):
@@ -123,6 +170,12 @@ def cmd_reclassify(args):
 
 
 def main():
+    # Titles contain emoji; a cp1252 console would raise UnicodeEncodeError
+    # mid-run and lose the work. Force UTF-8 on the CLI's own streams.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="config.yaml")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -150,6 +203,13 @@ def main():
     r = sub.add_parser("reclassify")
     r.add_argument("vod_id", help="twitch vod id (the number in the url)")
     r.set_defaults(func=cmd_reclassify)
+
+    rt = sub.add_parser("retitle", help="regenerate titles from cached data only")
+    rt.add_argument("vod_id", help="twitch vod id (the number in the url)")
+    rt.add_argument("--only")
+    rt.add_argument("--rename", action="store_true",
+                    help="also rename each game's .mp4 to the new title")
+    rt.set_defaults(func=cmd_retitle)
 
     args = p.parse_args()
     args.func(args)

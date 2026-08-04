@@ -49,6 +49,48 @@ riot:
   tag_line: COOL                  # main acct; alt-account games won't match and are skipped
   routing: europe                 # EUW -> europe match-v5 routing
   match_window_min: 10            # max |riot gameStart - detected start| to accept a match
+  fetch_timeline: true            # +1 call/game: gold diff at 10/15/20, first blood
+  cache: true                     # work/<VODID>/riot/*.json — lets retitle run with a dead key
+
+# Titles are generated from the riot facts + chat reaction + what he actually
+# said, then hard-validated. Templates in titles.py remain the fallback.
+titles:
+  provider: ollama                # ollama | none (none = templates only)
+  host: http://localhost:11434
+  model: qwen2.5:7b-instruct
+  candidates: 8                   # generated per game, then ranked by titles.score()
+  temperature: 0.7                # ranking supplies the variety; hot sampling just adds noise
+  timeout_sec: 180
+  # AMD/ROCm stability: left alone, Ollama sizes context from total VRAM (32768
+  # on a 24GB card) and allocates GBs of KV cache for a ~2k-token prompt. That
+  # was implicated in hard GPU faults. Pin it small — titles need nothing more.
+  num_ctx: 4096
+  num_predict: 400
+  # num_gpu: 0                    # uncomment to force CPU-only inference
+  keep_alive: 10m                 # keep the model resident across a whole VOD
+  retries: 3                      # a crashed GPU runner is retried, not skipped
+  history_file: output/title_history.json   # cross-VOD dedupe, all VODs share it
+  history_lookback: 40            # how many past titles the model is shown
+  similarity_max: 0.5             # reject if this fraction of words matches a past title
+  fallback_to_templates: true
+
+# What Baus said, per game. Measured 28x realtime on this machine, so a whole
+# VOD is ~12 min of CPU and runs happily alongside the GPU encode.
+transcribe:
+  enabled: true
+  mode: full                      # full | spikes (spikes = only around chat peaks)
+  model: small.en                 # faster-whisper; distil-large-v3 if quality lacks
+  device: cpu                     # ctranslate2 has no AMD GPU path; CPU is fast enough
+  compute_type: int8
+  threads: 8
+  spike_pad_sec: 60               # mode: spikes only
+
+# Message-rate spikes in the chat replay we already download, used to find the
+# moments worth transcribing and to gauge how hyped a game was.
+chat_stats:
+  bucket_sec: 10
+  min_spike_ratio: 3.0            # x median rate for the bucket to count as a spike
+  max_spikes: 5
 
 chat:
   enabled: true                   # burn synced twitch chat into every cut
@@ -63,4 +105,3 @@ thumbnails:
   cutouts_dir: cutouts            # transparent 1280x720 PNGs, left*/right* = face side
   frame_at: 0.6                   # take gameplay still at this fraction of the game
   font: C:/Windows/Fonts/impact.ttf
-
